@@ -10,7 +10,7 @@ Our mission is to create a dynamic, interactive Learning Management System (LMS)
 1. **Frontend**:
    - **User-Friendly Interface**: Easy navigation for courses and quizzes.
    - **Video Playback**: High-quality video support with controls for playback speed and subtitles.
-   - **Interactive Quizzes**: Real-time feedback on quiz answers.
+   - **Quizzes**: Real-time feedback on quiz answers.
 
 2. **Backend**:
    - **User Profiles**: Registration and management of user accounts.
