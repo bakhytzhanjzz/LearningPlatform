@@ -4,10 +4,20 @@ require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const connectDB = require("./config/db");
+const authRoutes = require("./routes/auth");
 
-// Middleware
+// Connect to the database
+connectDB();
+
+// Middleware to parse JSON bodies
+app.use(express.json());  // This handles JSON body parsing
+
+// Middleware for CORS
 app.use(cors());
-app.use(express.json());
+
+// Routes
+app.use("/api/auth/", authRoutes);
 
 // Test Route
 app.get("/", (req, res) => {
