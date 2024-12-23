@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 require("dotenv").config();
 
 const app = express();
@@ -19,10 +20,19 @@ app.use(cors());
 // Routes
 app.use("/api/auth/", authRoutes);
 
-// Test Route
-app.get("/", (req, res) => {
-  res.send("Backend is running!");
-});
+// Serve static files from the React app
+if (process.env.NODE_ENV === "production") {
+    app.use(express.static(path.join(__dirname, "../frontend/build")));
+  
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(__dirname, "../frontend/build", "index.html"));
+    });
+  } else {
+    // For development, you can run React frontend separately
+    app.get("/", (req, res) => {
+      res.send("Backend is running!");
+    });
+  }
 
 // Start Server
 app.listen(PORT, () => {
