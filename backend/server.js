@@ -18,6 +18,11 @@ app.use(cors());
 // API Routes - make sure this comes BEFORE the static file serving
 app.use("/api/auth", authRoutes);  // Remove trailing slash
 
+app.get('/about', (req, res) => {
+    console.log('About page route hit'); // Для проверки что маршрут работает
+    res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);

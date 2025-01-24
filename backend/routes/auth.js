@@ -1,9 +1,29 @@
-// backend/routes/auth.js
-
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const router = express.Router();
+const jwt = require('jsonwebtoken');
+
+router.get("/profile", async (req, res) => {
+    try {
+        const userId = req.query.userId;
+        
+        if (!userId) {
+            return res.status(400).json({ msg: "User ID is required" });
+        }
+
+        const user = await User.findById(userId).select('-password'); 
+        
+        if (!user) {
+            return res.status(404).json({ msg: "User not found" });
+        }
+
+        res.json(user);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ msg: "Server error" });
+    }
+});
 
 // Create User (Register)
 router.post("/register", async (req, res) => {
@@ -45,13 +65,31 @@ router.post("/login", async (req, res) => {
             return res.status(400).json({ msg: "Invalid credentials" });
         }
 
-        res.status(200).json({ msg: "Login successful" });
+        // Create JWT token
+        const token = jwt.sign(
+            { id: user._id },
+            'your-secret-key', // Replace with a real secret key in production
+            { expiresIn: '24h' }
+        );
+
+        // Send user data (excluding password) and token
+        const userData = {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            createdAt: user.createdAt
+        };
+
+        res.status(200).json({
+            msg: "Login successful",
+            token,
+            user: userData
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ msg: "Server error" });
     }
 });
-
 // Retrieve All Users
 router.get("/users", async (req, res) => {
     try {
