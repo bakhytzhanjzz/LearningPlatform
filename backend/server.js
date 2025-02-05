@@ -3,43 +3,149 @@ const cors = require("cors");
 const path = require("path");
 require("dotenv").config();
 
+const connectDB = require("./config/db");
+const { verifyEmailConfig } = require('./utils/emailService');
+const authRoutes = require("./routes/auth");
+const courseRoutes = require("./routes/courses");
+
 const app = express();
 const PORT = process.env.PORT || 5000;
-const connectDB = require("./config/db");
-const authRoutes = require("./routes/auth");
-
-// Connect to the database
-connectDB();
 
 // Middleware
-app.use(express.json());
-app.use(cors());
+app.use(cors({
+    origin: process.env.NODE_ENV === "production" 
+        ? process.env.FRONTEND_URL 
+        : "http://localhost:3000",
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// API Routes - make sure this comes BEFORE the static file serving
-app.use("/api/auth", authRoutes);  // Remove trailing slash
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-app.get('/about', (req, res) => {
-    console.log('About page route hit'); // Для проверки что маршрут работает
-    res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
+// Security Headers
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    next();
 });
 
-// Error handling middleware
+// Request Logging
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+});
+
+// API Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/courses", courseRoutes);
+
+// Global Error Handler
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ message: 'Something went wrong!' });
+    console.error('Error details:', {
+        message: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+        timestamp: new Date().toISOString(),
+        path: req.path,
+        method: req.method
+    });
+
+    // Mongoose Validation Error
+    if (err.name === 'ValidationError') {
+        return res.status(400).json({
+            status: 'error',
+            message: 'Validation error',
+            details: Object.values(err.errors).map(e => e.message)
+        });
+    }
+
+    // JWT Authentication Error
+    if (err.name === 'UnauthorizedError') {
+        return res.status(401).json({
+            status: 'error',
+            message: 'Authentication failed'
+        });
+    }
+
+    // Mongoose Duplicate Key Error
+    if (err.code === 11000) {
+        const field = Object.keys(err.keyValue)[0];
+        return res.status(409).json({
+            status: 'error',
+            message: `Duplicate value for ${field}`
+        });
+    }
+
+    // Default Error Response
+    res.status(err.status || 500).json({
+        status: 'error',
+        message: process.env.NODE_ENV === 'production' 
+            ? 'An error occurred' 
+            : err.message
+    });
 });
 
-// Serve static files from the React app
+// Serve Static Files in Production
 if (process.env.NODE_ENV === "production") {
     app.use(express.static(path.join(__dirname, "../frontend/build")));
-} 
+    
+    app.get("*", (req, res) => {
+        res.sendFile(path.join(__dirname, "../frontend/build", "index.html"));
+    });
+} else {
+    app.get("/", (req, res) => {
+        res.json({ 
+            message: "API is running",
+            environment: process.env.NODE_ENV,
+            timestamp: new Date().toISOString()
+        });
+    });
+}
 
-// This should be the last route
-app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../frontend/build", "index.html"));
-});
+// Initialize Server
+const startServer = async () => {
+    try {
+        // Connect to MongoDB
+        await connectDB();
+        console.log('MongoDB Connected successfully');
 
-// Start Server
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-});
+        // Verify Email Configuration
+        const emailConfigured = await verifyEmailConfig();
+        if (!emailConfigured) {
+            console.warn('Warning: Email service is not configured properly');
+            console.warn('Please check your EMAIL_USER and EMAIL_PASS environment variables');
+        } else {
+            console.log('Email service configured successfully');
+        }
+
+        // Start Server
+        const server = app.listen(PORT, () => {
+            console.log(`Server is running on http://localhost:${PORT}`);
+            console.log('Environment:', process.env.NODE_ENV);
+            console.log('Time:', new Date().toISOString());
+        });
+
+        // Graceful Shutdown
+        const shutdown = async () => {
+            console.log('Shutting down server...');
+            await new Promise((resolve) => server.close(resolve));
+            console.log('Server closed');
+            process.exit(0);
+        };
+
+        process.on('SIGTERM', shutdown);
+        process.on('SIGINT', shutdown);
+
+    } catch (error) {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+    }
+};
+
+// Start the server
+startServer().catch(console.error);
+
+module.exports = app;

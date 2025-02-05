@@ -7,8 +7,13 @@ import Contact from './components/Contact';
 import Help from './components/Help';
 import CourseList from './components/Courses/CourseList';
 import MyCourses from './components/Courses/MyCourses';
+import CourseDetail from './components/Courses/CourseDetail';
+import LessonView from './components/Courses/LessonView';
+import VerificationForm from './components/VerificationForm';
 
 const API_URL = 'http://localhost:5000/api/auth';
+
+axios.defaults.baseURL = 'http://localhost:5000';
 
 const Navigation = ({ isLoggedIn, setShowLogin, setShowSignup, handleLogout }) => {
   const navigate = useNavigate();
@@ -24,12 +29,14 @@ const Navigation = ({ isLoggedIn, setShowLogin, setShowSignup, handleLogout }) =
             ALASH
           </div>
           <div className="flex space-x-4 pr-2">
-            <button 
-              onClick={() => navigate('/courses')} 
-              className="hover:text-blue-500 px-2 transition-colors"
-            >
-              My Courses
-            </button>
+            {isLoggedIn && (
+              <button 
+                onClick={() => navigate('/courses')} 
+                className="hover:text-blue-500 px-2 transition-colors"
+              >
+                My Courses
+              </button>
+            )}
             {isLoggedIn && (
               <button 
                 onClick={() => navigate('/profile')} 
@@ -222,76 +229,77 @@ const SignupForm = ({ onClose, onSignup, error }) => {
 
 const Home = () => (
   <main className="max-w-8xl mx-auto px-8 py-8">
-    <h1 className="text-3xl font-bold mb-8">Available Courses</h1>
-    {/* Add your courses content here */}
+    <CourseList />
   </main>
 );
 
-const AppWrapper = () => {
+const App = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [error, setError] = useState('');
+  const [pendingVerification, setPendingVerification] = useState(null);
 
-  const handleLogin = async (loginData) => {
-    try {
-      const response = await axios.post(`${API_URL}/login`, loginData);
-      const { token, user, msg } = response.data;
-      
-      localStorage.setItem('token', token);
-      localStorage.setItem('userId', user.id);
-      
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
-      setIsLoggedIn(true);
-      setCurrentUser(user);
-      setShowLogin(false);
-      setError('');
-    } catch (err) {
-      console.error('Login error:', err);
-      setError(err.response?.data?.msg || 'Login failed');
-    }
-  };
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          const errorCode = error.response?.data?.code;
+          
+          // Если сессия истекла из-за входа на другом устройстве
+          if (errorCode === 'SESSION_EXPIRED') {
+            // Очищаем локальное хранилище
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            
+            // Сбрасываем состояние приложения
+            setIsLoggedIn(false);
+            setCurrentUser(null);
+            
+            // Показываем уведомление пользователю
+            setError('Your session has ended because you logged in on another device');
+          }
+          // Если токен просто истек
+          else if (errorCode === 'TOKEN_EXPIRED') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            setIsLoggedIn(false);
+            setCurrentUser(null);
+            setError('Your session has expired. Please log in again');
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
 
-  const handleSignup = async (signupData) => {
-    if (signupData.error) {
-      setError(signupData.error);
-      return;
-    }
-    try {
-      await axios.post(`${API_URL}/register`, {
-        name: signupData.name,
-        email: signupData.email,
-        password: signupData.password,
-      });
-      setShowSignup(false);
-      setShowLogin(true);
-      setError('');
-    } catch (err) {
-      setError(err.response?.data?.msg || 'Registration failed');
-    }
-  };
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userId');
-    delete axios.defaults.headers.common['Authorization'];
-    setIsLoggedIn(false);
-    setCurrentUser(null);
-  };
+  useEffect(() => {
+    axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        console.error('API Error:', error.response?.data || error.message);
+        return Promise.reject(error);
+      }
+    );
+  }, []);
 
   useEffect(() => {
     const checkAuthStatus = async () => {
       const token = localStorage.getItem('token');
-      if (token) {
+      const userId = localStorage.getItem('userId');
+      
+      if (token && userId) {
         try {
-          const response = await axios.get(`${API_URL}/verify`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          const response = await axios.get(`/api/auth/profile?userId=${userId}`);
           setIsLoggedIn(true);
           setCurrentUser(response.data);
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         } catch (err) {
           localStorage.removeItem('token');
           localStorage.removeItem('userId');
@@ -305,60 +313,193 @@ const AppWrapper = () => {
     checkAuthStatus();
   }, []);
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Navigation
-        isLoggedIn={isLoggedIn}
-        setShowLogin={setShowLogin}
-        setShowSignup={setShowSignup}
-        handleLogout={handleLogout}
-      />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/help" element={<Help />} />
-        <Route
-          path="/profile"
-          element={
-            isLoggedIn ? (
-              <Profile user={currentUser} />
-            ) : (
-              <Navigate to="/" replace />
-            )
-          }
+  const handleSignup = async (signupData) => {
+    if (signupData.error) {
+      setError(signupData.error);
+      return;
+    }
+    try {
+      console.log('Sending signup request:', {
+        name: signupData.name,
+        email: signupData.email
+      });
 
+      const response = await axios.post('/api/auth/register', signupData);
+      console.log('Signup response:', response.data);
+
+      setPendingVerification({
+        email: signupData.email,
+        type: 'registration'
+      });
+      setError('');
+    } catch (err) {
+      const errorMessage = err.response?.data?.msg || 'Registration failed';
+      console.error('Signup error:', errorMessage);
+      setError(errorMessage);
+    }
+  };
+
+  const handleLogin = async (loginData) => {
+    try {
+      console.log('Sending login request:', { email: loginData.email });
+      
+      const response = await axios.post('/api/auth/login', loginData);
+      console.log('Login response:', response.data);
+
+      if (response.data.token) {
+        // Если сервер не требует верификации
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('userId', response.data.user.id);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        setIsLoggedIn(true);
+        setCurrentUser(response.data.user);
+        setShowLogin(false);
+      } else {
+        // Если требуется верификация
+        setPendingVerification({
+          email: loginData.email,
+          type: 'login'
+        });
+      }
+      setError('');
+    } catch (err) {
+      const errorMessage = err.response?.data?.msg || 'Login failed';
+      console.error('Login error:', errorMessage);
+      setError(errorMessage);
+    }
+  };
+
+  const handleVerification = async (code) => {
+    try {
+      const endpoint = pendingVerification.type === 'registration' 
+        ? '/api/auth/verify-email' 
+        : '/api/auth/verify-login';
         
-        />
-      </Routes>
-      {showLogin && (
-        <LoginForm
-          onClose={() => {
-            setShowLogin(false);
-            setError('');
-          }}
-          onLogin={handleLogin}
-          error={error}
-        />
-      )}
-      {showSignup && (
-        <SignupForm
-          onClose={() => {
-            setShowSignup(false);
-            setError('');
-          }}
-          onSignup={handleSignup}
-          error={error}
-        />
-      )}
-    </div>
-  );
-};
+      const response = await axios.post(endpoint, {
+        email: pendingVerification.email,
+        code
+      });
 
-const App = () => {
+      if (pendingVerification.type === 'registration') {
+        setPendingVerification(null);
+        setShowSignup(false);
+        setShowLogin(true);
+      } else {
+        const { token, user } = response.data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('userId', user.id);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        setIsLoggedIn(true);
+        setCurrentUser(user);
+        setPendingVerification(null);
+        setShowLogin(false);
+      }
+      setError('');
+    } catch (err) {
+      const errorMessage = err.response?.data?.msg || 'Verification failed';
+      console.error('Verification error:', errorMessage);
+      setError(errorMessage);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await axios.post('/api/auth/logout');
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('userId');
+      delete axios.defaults.headers.common['Authorization'];
+      setIsLoggedIn(false);
+      setCurrentUser(null);
+    }
+  };
+
   return (
     <Router>
-      <AppWrapper />
+      <div className="min-h-screen bg-gray-50">
+        <Navigation
+          isLoggedIn={isLoggedIn}
+          setShowLogin={setShowLogin}
+          setShowSignup={setShowSignup}
+          handleLogout={handleLogout}
+        />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/help" element={<Help />} />
+          <Route
+            path="/profile"
+            element={
+              isLoggedIn ? (
+                <Profile user={currentUser} />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+          <Route
+            path="/courses"
+            element={
+              isLoggedIn ? (
+                <MyCourses />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+          <Route path="/courses/:courseId" element={<CourseDetail />} />
+          <Route
+            path="/courses/:courseId/lessons/:lessonIndex"
+            element={
+              isLoggedIn ? (
+                <LessonView />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+        </Routes>
+
+        {showSignup && !pendingVerification && (
+          <SignupForm
+            onClose={() => {
+              setShowSignup(false);
+              setError('');
+            }}
+            onSignup={handleSignup}
+            error={error}
+          />
+        )}
+
+        {showLogin && !pendingVerification && (
+          <LoginForm
+            onClose={() => {
+              setShowLogin(false);
+              setError('');
+            }}
+            onLogin={handleLogin}
+            error={error}
+          />
+        )}
+
+        {pendingVerification && (
+          <VerificationForm
+            email={pendingVerification.email}
+            type={pendingVerification.type}
+            onVerify={handleVerification}
+            onCancel={() => {
+              setPendingVerification(null);
+              setError('');
+            }}
+          />
+        )}
+      </div>
     </Router>
   );
 };
