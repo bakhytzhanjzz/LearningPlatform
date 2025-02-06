@@ -11,7 +11,7 @@ const CourseList = () => {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/courses');
+        const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/courses`);
         console.log('API Response:', response.data);
         
         if (Array.isArray(response.data)) {

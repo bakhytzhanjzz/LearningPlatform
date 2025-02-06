@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, useNavigate, Navigate } from 'react-router-dom';
 import axios from 'axios';
+import { Menu, X } from 'lucide-react';
 import Profile from './Profile';
 import About from './About';
 import Contact from './components/Contact';
@@ -11,60 +12,74 @@ import CourseDetail from './components/Courses/CourseDetail';
 import LessonView from './components/Courses/LessonView';
 import VerificationForm from './components/VerificationForm';
 
-const API_URL = 'http://localhost:5000/api/auth';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api/auth';
+axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-axios.defaults.baseURL = 'http://localhost:5000';
-
+// Navigation Component
 const Navigation = ({ isLoggedIn, setShowLogin, setShowSignup, handleLogout }) => {
   const navigate = useNavigate();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  const handleNavigation = (path) => {
+    navigate(path);
+    setIsMenuOpen(false);
+  };
 
   return (
-    <nav className="bg-white shadow-lg">
-      <div className="w-full px-2">
+    <nav className="bg-white shadow-lg relative">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
+          {/* Logo */}
           <div 
-            onClick={() => navigate('/')} 
-            className="text-xl font-bold pl-2 cursor-pointer hover:text-blue-500"
+            onClick={() => handleNavigation('/')} 
+            className="text-xl font-bold cursor-pointer hover:text-blue-500"
           >
             ALASH
           </div>
-          <div className="flex space-x-4 pr-2">
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-4">
             {isLoggedIn && (
-              <button 
-                onClick={() => navigate('/courses')} 
-                className="hover:text-blue-500 px-2 transition-colors"
-              >
-                My Courses
-              </button>
-            )}
-            {isLoggedIn && (
-              <button 
-                onClick={() => navigate('/profile')} 
-                className="hover:text-blue-500 px-2 transition-colors"
-              >
-                My Profile
-              </button>
+              <>
+                <button 
+                  onClick={() => handleNavigation('/courses')} 
+                  className="hover:text-blue-500 px-2 transition-colors"
+                >
+                  My Courses
+                </button>
+                <button 
+                  onClick={() => handleNavigation('/profile')} 
+                  className="hover:text-blue-500 px-2 transition-colors"
+                >
+                  My Profile
+                </button>
+              </>
             )}
             <button 
-              onClick={() => navigate('/about')} 
+              onClick={() => handleNavigation('/about')} 
               className="hover:text-blue-500 px-2 transition-colors"
             >
               About
             </button>
             <button 
-              onClick={() => navigate('/help')} 
+              onClick={() => handleNavigation('/help')} 
               className="hover:text-blue-500 px-2 transition-colors"
             >
               Help
             </button>
             <button 
-              onClick={() => navigate('/contact')} 
+              onClick={() => handleNavigation('/contact')} 
               className="hover:text-blue-500 px-2 transition-colors"
             >
               Contact
             </button>
+            
             {!isLoggedIn ? (
-              <>
+              <div className="flex space-x-2">
                 <button
                   onClick={() => setShowLogin(true)}
                   className="bg-blue-500 text-white px-4 py-1 rounded hover:bg-blue-600 transition-colors"
@@ -77,7 +92,7 @@ const Navigation = ({ isLoggedIn, setShowLogin, setShowSignup, handleLogout }) =
                 >
                   Sign Up
                 </button>
-              </>
+              </div>
             ) : (
               <button
                 onClick={handleLogout}
@@ -87,73 +102,164 @@ const Navigation = ({ isLoggedIn, setShowLogin, setShowSignup, handleLogout }) =
               </button>
             )}
           </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden">
+            <button
+              onClick={toggleMenu}
+              className="text-gray-600 hover:text-gray-900 focus:outline-none"
+            >
+              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Navigation */}
+        {isMenuOpen && (
+          <div className="md:hidden absolute top-16 left-0 right-0 bg-white shadow-lg z-50">
+            <div className="px-4 pt-2 pb-4 space-y-2">
+              {isLoggedIn && (
+                <>
+                  <button 
+                    onClick={() => handleNavigation('/courses')} 
+                    className="block w-full text-left px-3 py-2 rounded hover:bg-gray-100"
+                  >
+                    My Courses
+                  </button>
+                  <button 
+                    onClick={() => handleNavigation('/profile')} 
+                    className="block w-full text-left px-3 py-2 rounded hover:bg-gray-100"
+                  >
+                    My Profile
+                  </button>
+                </>
+              )}
+              <button 
+                onClick={() => handleNavigation('/about')} 
+                className="block w-full text-left px-3 py-2 rounded hover:bg-gray-100"
+              >
+                About
+              </button>
+              <button 
+                onClick={() => handleNavigation('/help')} 
+                className="block w-full text-left px-3 py-2 rounded hover:bg-gray-100"
+              >
+                Help
+              </button>
+              <button 
+                onClick={() => handleNavigation('/contact')} 
+                className="block w-full text-left px-3 py-2 rounded hover:bg-gray-100"
+              >
+                Contact
+              </button>
+              
+              {!isLoggedIn ? (
+                <div className="space-y-2 pt-2">
+                  <button
+                    onClick={() => {
+                      setShowLogin(true);
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSignup(true);
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors"
+                  >
+                    Sign Up
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors mt-2"
+                >
+                  Logout
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   );
 };
 
+// Login Form Component
 const LoginForm = ({ onClose, onLogin, error }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     onLogin({ email, password });
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-8 rounded-lg shadow-lg w-96 max-w-[90%]">
-        <h2 className="text-2xl mb-4 font-bold">Login</h2>
-        {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block mb-2 font-medium">Email:</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border p-2 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block mb-2 font-medium">Password:</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full border p-2 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors"
-          >
-            Login
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full border border-gray-300 p-2 rounded mt-2 hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-        </form>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-md mx-4 sm:mx-auto">
+        <div className="p-6">
+          <h2 className="text-2xl mb-4 font-bold">Login</h2>
+          {error && (
+            <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block mb-2 font-medium">Email:</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full border p-2 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block mb-2 font-medium">Password:</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full border p-2 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors"
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full border border-gray-300 p-2 rounded hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
 };
 
+// Signup Form Component
 const SignupForm = ({ onClose, onSignup, error }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
       onSignup({ error: 'Passwords do not match' });
@@ -163,76 +269,82 @@ const SignupForm = ({ onClose, onSignup, error }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-8 rounded-lg shadow-lg w-96 max-w-[90%]">
-        <h2 className="text-2xl mb-4 font-bold">Sign Up</h2>
-        {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block mb-2 font-medium">Full Name:</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full border p-2 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block mb-2 font-medium">Email:</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border p-2 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block mb-2 font-medium">Password:</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full border p-2 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block mb-2 font-medium">Confirm Password:</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full border p-2 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors"
-          >
-            Sign Up
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full border border-gray-300 p-2 rounded mt-2 hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-        </form>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-md mx-4 sm:mx-auto">
+        <div className="p-6">
+          <h2 className="text-2xl mb-4 font-bold">Sign Up</h2>
+          {error && (
+            <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block mb-2 font-medium">Full Name:</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full border p-2 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block mb-2 font-medium">Email:</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full border p-2 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block mb-2 font-medium">Password:</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full border p-2 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block mb-2 font-medium">Confirm Password:</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full border p-2 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors"
+            >
+              Sign Up
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full border border-gray-300 p-2 rounded hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
 };
 
+// Home Component
 const Home = () => (
-  <main className="max-w-8xl mx-auto px-8 py-8">
+  <main className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
     <CourseList />
   </main>
 );
 
+// Main App Component
 const App = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
